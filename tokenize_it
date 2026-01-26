@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+try:
+    import pandas as pd
+except ImportError:
+    print("Error: pandas is not installed. Install it with `pip install pandas`.")
+    exit(1)
+
+try:
+    import nltk
+    from nltk.tokenize import word_tokenize
+    from nltk.corpus import stopwords
+    from nltk.stem import PorterStemmer
+except ImportError:
+    print("Error: nltk is not installed. Install it with `pip install nltk`.")
+
+import argparse
+import pandas as pd
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+
+def pre_process(text_file, lower=False, stops=False, stem=False, no_rares=None):
+    # Step 1: lowercase
+    tokens = word_tokenize(text_file)
+    if lower:
+        tokens = [t.lower() for t in tokens]
+
+    # Step 2: remove stopwords & non-alpha
+    if stops:
+        stop_words = set(stopwords.words('english'))
+        tokens = [w for w in tokens if w.isalpha() and w not in stop_words]
+    else:
+        tokens = [w for w in tokens if w.isalpha()]
+
+    # Step 3: stemming
+    if stem:
+        stemmer = PorterStemmer()
+        tokens = [stemmer.stem(w) for w in tokens]
+
+    # Step 4: count unique tokens
+    tokens_uniques_df = (
+        pd.Series(tokens)
+        .value_counts()
+        .reset_index(name='count')
+        .rename(columns={'index': 'words'})
+    )
+
+    # Step 5: remove rare words
+    if no_rares is not None:
+        tokens_uniques_df = tokens_uniques_df[tokens_uniques_df['count'] > no_rares]
+    tokens_uniques_df = tokens_uniques_df.sort_values(by='count', ascending=False)
+    return tokens_uniques_df
+
+def main():
+    parser = argparse.ArgumentParser(description="Tokenize text with optional preprocessing.")
+    parser.add_argument('--file', required=True, help="Path to the text file")
+    parser.add_argument('--lower', action='store_true', help="Lowercase all text")
+    parser.add_argument('--stops', action='store_true', help="Remove stopwords")
+    parser.add_argument('--stem', action='store_true', help="Apply Porter stemming")
+    parser.add_argument('--no-rares', type=int, default=None, help="Remove words with counts <= this number")
+
+    args = parser.parse_args()
+
+    with open(args.file, 'r') as f:
+        text = f.read()
+
+    df = pre_process(
+        text,
+        lower=args.lower,
+        stops=args.stops,
+        stem=args.stem,
+        no_rares=args.no_rares
+    )
+
+    print(df)
+    print(f'There are {len(df)} unique tokens in this file.')
+
+if __name__ == "__main__":
+    main()
